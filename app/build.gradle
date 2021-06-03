@@ -36,4 +36,6 @@ dependencies {
     testImplementation 'junit:junit:4.+'
     androidTestImplementation 'androidx.test.ext:junit:1.1.2'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.3.0'
+    implementation project (':jsoup-1.8.2')
+    implementation group: 'cz.msebera.android', name: 'httpclient', version: '4.4.1.2'
 }
