@@ -47,7 +47,7 @@ public class Data {
     @Override
     public String toString() {
         return "Converted values are {" +
-                ", USD ='" + this.USD + '\'' +
+                "USD ='" + this.USD + '\'' +
                 ", EURO ='" + this.USD +
                 ", LAST UPDATE ='" + this.lastUpdate + '\'' +
                 '}';

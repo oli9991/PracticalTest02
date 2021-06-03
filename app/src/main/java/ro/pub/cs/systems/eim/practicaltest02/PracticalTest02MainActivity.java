@@ -66,6 +66,12 @@ public class PracticalTest02MainActivity extends AppCompatActivity {
                 Toast.makeText(getApplicationContext(), "[MAIN ACTIVITY] Client connection parameters should be filled!", Toast.LENGTH_SHORT).show();
                 return;
             }
+            Log.i(Constants.TAG, "[MAIN ACTIVITY] onClick() callback method has been invoked : " +  valutaString);
+
+            if(!valutaString.equals(Constants.EUR) && !valutaString.equals(Constants.USD)) {
+                Toast.makeText(getApplicationContext(), "[MAIN ACTIVITY] The current options are EUR / USD!", Toast.LENGTH_SHORT).show();
+                return;
+            }
             if (serverThread == null || !serverThread.isAlive()) {
                 Toast.makeText(getApplicationContext(), "[MAIN ACTIVITY] There is no server to connect to!", Toast.LENGTH_SHORT).show();
                 return;

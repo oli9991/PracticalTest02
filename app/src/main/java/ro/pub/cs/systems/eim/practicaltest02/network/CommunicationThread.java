@@ -1,6 +1,9 @@
 package ro.pub.cs.systems.eim.practicaltest02.network;
 
+import android.os.Build;
 import android.util.Log;
+
+import androidx.annotation.RequiresApi;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -13,8 +16,12 @@ import java.net.Socket;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.Period;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.Locale;
+import java.util.concurrent.TimeUnit;
 
 import cz.msebera.android.httpclient.HttpEntity;
 import cz.msebera.android.httpclient.HttpResponse;
@@ -36,6 +43,7 @@ public class CommunicationThread  extends Thread {
         this.socket = socket;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     @Override
     public void run() {
         if (socket == null) {
@@ -57,62 +65,42 @@ public class CommunicationThread  extends Thread {
                 return;
             }
 
-            Data data = null;
-
-            Log.i(Constants.TAG, "[COMMUNICATION THREAD] Getting the information from the webservice...");
             HttpClient httpClient = new DefaultHttpClient();
             String pageSourceCode = "";
 
-            HttpGet httpGet = new HttpGet(Constants.WEB_SERVICE_ADDRESS + valuta + Constants.WEB_SERVICE_MODE);
-            HttpResponse httpGetResponse = httpClient.execute(httpGet);
-            HttpEntity httpGetEntity = httpGetResponse.getEntity();
-            if (httpGetEntity != null) {
-                pageSourceCode = EntityUtils.toString(httpGetEntity);
+            long diff = 0;
 
+            if(serverThread.getCache() != null) {
+                Date currentDate = new Date();
+                Date lastUpdate = serverThread.getCache().getLastUpdate();
+
+                long diffInMillies = Math.abs(lastUpdate.getTime() - currentDate.getTime());
+                diff = TimeUnit.SECONDS.convert(diffInMillies, TimeUnit.SECONDS);
             }
 
-            if (pageSourceCode == null) {
-                Log.e(Constants.TAG, "[COMMUNICATION THREAD] Error getting the information from the webservice!");
-                return;
-            } else {
-                Log.i(Constants.TAG, pageSourceCode);
 
-                /* info from server */
-                JSONObject content = new JSONObject(pageSourceCode);
-                String eur = "";
-                String usd = "";
-                Date lastUpdate = new Date();
+            Log.i(Constants.TAG, "[COMMUNICATION THREAD] Last update was " + diff + " seconds ago");
 
-                JSONObject time = content.getJSONObject("time");
-                String lastUpdateString = time.getString("updated");
+            if(serverThread.getCache() == null || diff > 60) {
 
-                DateFormat format = new SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH);
-                lastUpdate = format.parse(lastUpdateString);
+                Log.i(Constants.TAG, "[COMMUNICATION THREAD] Getting the information from the webservice...");
+                HttpGet httpGet = new HttpGet(Constants.WEB_SERVICE_ADDRESS + "eur" + Constants.WEB_SERVICE_MODE);
+                HttpResponse httpGetResponse = httpClient.execute(httpGet);
+                HttpEntity httpGetEntity = httpGetResponse.getEntity();
 
-                JSONObject bpi = content.getJSONObject("bpi");
-                JSONObject EURO = bpi.getJSONObject("EUR");
-                String EURO_Value = EURO.getString("rate");
-
-                JSONObject USD = bpi.getJSONObject("USD");
-                String USD_Value = USD.getString("rate");
-
-
-                data = new Data(EURO_Value, USD_Value, lastUpdate);
-
-
-                if (data == null) {
-                    Log.e(Constants.TAG, "[COMMUNICATION THREAD] Weather Forecast Information is null!");
-                    return;
+                if (httpGetEntity != null) {
+                    pageSourceCode = EntityUtils.toString(httpGetEntity);
                 }
 
-
+                serverThread.setCache(null);
+            } else {
                 String result = null;
                 switch(valuta) {
                     case Constants.EUR:
-                        result = data.getEUR();
+                        result = serverThread.getCache().getEUR();
                         break;
                     case Constants.USD:
-                        result = data.getUSD();
+                        result = serverThread.getCache().getUSD();
                         break;
                     default:
                         result = "[COMMUNICATION THREAD] Wrong information type (USD / EUR)!";
@@ -120,6 +108,57 @@ public class CommunicationThread  extends Thread {
 
                 printWriter.println(result);
                 printWriter.flush();
+            }
+
+            if(serverThread.getCache() == null) {
+                if (pageSourceCode == null) {
+                    Log.e(Constants.TAG, "[COMMUNICATION THREAD] Error getting the information from the webservice!");
+                    return;
+                } else {
+                    Log.i(Constants.TAG, pageSourceCode);
+
+                    /* info from server */
+                    JSONObject content = new JSONObject(pageSourceCode);
+                    Date updateFromWeb = new Date();
+
+                    JSONObject time = content.getJSONObject("time");
+                    String lastUpdateString = time.getString("updated");
+
+                    DateFormat format = new SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH);
+                    updateFromWeb = format.parse(lastUpdateString);
+
+                    JSONObject bpi = content.getJSONObject("bpi");
+                    JSONObject EURO = bpi.getJSONObject("EUR");
+                    String EURO_Value = EURO.getString("rate");
+
+                    JSONObject USD = bpi.getJSONObject("USD");
+                    String USD_Value = USD.getString("rate");
+
+                    if (serverThread.getCache() == null) {
+                        serverThread.setCache(new Data(EURO_Value, USD_Value, updateFromWeb));
+                    }
+
+                    if (serverThread.getCache() == null) {
+                        Log.e(Constants.TAG, "[COMMUNICATION THREAD] Weather Forecast Information is null!");
+                        return;
+                    }
+
+                    String result = null;
+                    Log.i(Constants.TAG, "[COMMUNICATION THREAD] " + valuta + " " + serverThread.getCache().toString());
+                    switch (valuta) {
+                        case Constants.EUR:
+                            result = serverThread.getCache().getEUR();
+                            break;
+                        case Constants.USD:
+                            result = serverThread.getCache().getUSD();
+                            break;
+                        default:
+                            result = "[COMMUNICATION THREAD] Wrong information type (USD / EUR)!";
+                    }
+
+                    printWriter.println(result);
+                    printWriter.flush();
+                }
             }
         } catch (IOException ioException) {
             Log.e(Constants.TAG, "[COMMUNICATION THREAD] An exception has occurred: " + ioException.getMessage());
